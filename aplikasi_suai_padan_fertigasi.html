@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ms">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aplikasi Suai Padan: Sistem Fertigasi</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        body {
+            background-color: #f0fdfa;
+            background-image: radial-gradient(#bae6fd 1px, transparent 1px);
+            background-size: 20px 20px;
+        }
+        .component-card {
+            transition: all 0.2s ease-in-out;
+            cursor: pointer;
+        }
+        .component-card:hover {
+            transform: scale(1.05);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+        }
+        .selected {
+            border: 3px solid #3b82f6 !important;
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(59,130,246,0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(59,130,246,0); }
+            100% { box-shadow: 0 0 0 0 rgba(59,130,246,0); }
+        }
+        .drop-zone {
+            min-height: 80px;
+            transition: all 0.2s ease-in-out;
+        }
+        .drop-zone.active-target {
+            background-color: #e0f2fe;
+            border-color: #3b82f6;
+            border-style: dashed;
+        }
+        .correct-match {
+            background-color: #dcfce7 !important;
+            border-color: #22c55e !important;
+        }
+        .incorrect-match {
+            background-color: #fee2e2 !important;
+            border-color: #ef4444 !important;
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-800 font-sans pb-10">
+
+    <!-- Header -->
+    <header class="bg-gradient-to-r from-green-500 to-teal-600 text-white shadow-lg p-6 text-center rounded-b-3xl mb-8 mx-auto max-w-5xl">
+        <h1 class="text-3xl md:text-4xl font-extrabold mb-2">🌱 Suai Padan Fertigasi</h1>
+        <p class="text-lg opacity-90">Reka Bentuk & Teknologi Tingkatan 1</p>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4">
+        
+        <!-- Instructions -->
+        <div class="bg-white rounded-xl shadow-md p-5 mb-8 border-l-4 border-blue-500 flex items-center justify-between flex-wrap gap-4">
+            <div>
+                <h3 class="font-bold text-lg text-blue-700">Cara Bermain:</h3>
+                <p class="text-slate-600">1. Klik/Sentuh <span class="font-semibold">Komponen</span> di sebelah kiri.<br>
+                2. Klik/Sentuh kotak kosong di sebelah <span class="font-semibold">Fungsi</span> untuk meletakkan komponen tersebut.</p>
+            </div>
+            <div class="flex gap-2">
+                <button id="btn-check" class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-lg font-bold shadow-md transition transform hover:-translate-y-1">✔️ Semak Jawapan</button>
+                <button id="btn-reset" class="bg-slate-500 hover:bg-slate-600 text-white px-6 py-3 rounded-lg font-bold shadow-md transition transform hover:-translate-y-1">🔄 Mula Semula</button>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-8">
+            
+            <!-- Components Pool (Left Side) -->
+            <div class="md:col-span-4 bg-white rounded-2xl shadow-lg p-6 border-t-4 border-yellow-400">
+                <h2 class="text-xl font-bold text-center mb-4 text-slate-700">📦 Komponen</h2>
+                <p class="text-sm text-center text-slate-500 mb-6">Pilih dari sini</p>
+                
+                <div id="components-pool" class="flex flex-col gap-3 min-h-[400px]">
+                    <!-- Components will be injected here via JS -->
+                </div>
+            </div>
+
+            <!-- Functions / Drop Zones (Right Side) -->
+            <div class="md:col-span-8 bg-white rounded-2xl shadow-lg p-6 border-t-4 border-green-500">
+                <h2 class="text-xl font-bold text-center mb-4 text-slate-700">🎯 Fungsi</h2>
+                <p class="text-sm text-center text-slate-500 mb-6">Padankan komponen di dalam kotak kosong</p>
+
+                <div id="functions-list" class="flex flex-col gap-4">
+                    <!-- Functions will be injected here via JS -->
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // Data for the game
+        const gameData = [
+            { id: 'c1', name: 'Tangki Nutrien', icon: '🛢️', color: 'bg-blue-100 border-blue-300 text-blue-800', desc: 'Tempat untuk menakung dan menyimpan larutan baja yang telah dibancuh.' },
+            { id: 'c2', name: 'Pam Air', icon: '⚙️', color: 'bg-gray-200 border-gray-400 text-gray-800', desc: 'Mengepam dan menolak larutan baja dari tangki ke seluruh sistem perpaipan.' },
+            { id: 'c3', name: 'Alat Pemasa', icon: '⏱️', color: 'bg-yellow-100 border-yellow-300 text-yellow-800', desc: 'Menetapkan masa siraman baja secara automatik mengikut jadual.' },
+            { id: 'c4', name: 'Penapis', icon: '🕸️', color: 'bg-indigo-100 border-indigo-300 text-indigo-800', desc: 'Menghalang bendasing atau kotoran daripada masuk dan menyumbat paip.' },
+            { id: 'c5', name: 'Set Penitis', icon: '💧', color: 'bg-teal-100 border-teal-300 text-teal-800', desc: 'Menyalurkan larutan baja secara titisan terus ke pangkal tanaman.' },
+            { id: 'c6', name: 'Paip Poli', icon: '🚰', color: 'bg-slate-800 border-slate-900 text-white', desc: 'Saluran utama, sekunder, dan tertier untuk pergerakan air baja.' },
+            { id: 'c7', name: 'Media Tanaman', icon: '🥥', color: 'bg-amber-100 border-amber-300 text-amber-900', desc: 'Bahan gantian tanah (seperti sabut kelapa) untuk akar berpaut.' },
+            { id: 'c8', name: 'Meter EC', icon: '🌡️', color: 'bg-purple-100 border-purple-300 text-purple-800', desc: 'Mengukur tahap kepekatan larutan baja (Elektro Konduktiviti).' }
+        ];
+
+        let selectedComponentId = null;
+
+        // Shuffle function
+        function shuffleArray(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        // Initialize Game
+        function initGame() {
+            const poolContainer = document.getElementById('components-pool');
+            const functionsContainer = document.getElementById('functions-list');
+            
+            poolContainer.innerHTML = '';
+            functionsContainer.innerHTML = '';
+            selectedComponentId = null;
+
+            // Clone and shuffle data for components
+            let components = shuffleArray([...gameData]);
+            // Clone and shuffle data for descriptions
+            let functions = shuffleArray([...gameData]);
+
+            // Render Components
+            components.forEach(item => {
+                const compEl = createComponentElement(item);
+                poolContainer.appendChild(compEl);
+            });
+
+            // Render Functions
+            functions.forEach(item => {
+                const funcRow = document.createElement('div');
+                funcRow.className = "flex flex-col sm:flex-row items-stretch border-2 border-slate-200 rounded-xl overflow-hidden bg-slate-50";
+                
+                // Description Text
+                const descDiv = document.createElement('div');
+                descDiv.className = "p-4 flex-1 flex items-center bg-white";
+                descDiv.innerHTML = `<p class="text-slate-700 font-medium">${item.desc}</p>`;
+
+                // Drop Zone
+                const dropDiv = document.createElement('div');
+                dropDiv.className = "drop-zone sm:w-1/2 p-2 bg-slate-100 flex items-center justify-center border-l-2 border-slate-200 cursor-pointer";
+                dropDiv.dataset.matchId = item.id;
+                
+                // Drop Zone Placeholder Text
+                dropDiv.innerHTML = `<span class="text-slate-400 text-sm italic pointer-events-none">Klik di sini untuk padan</span>`;
+
+                dropDiv.addEventListener('click', () => handleDropZoneClick(dropDiv));
+
+                funcRow.appendChild(descDiv);
+                funcRow.appendChild(dropDiv);
+                functionsContainer.appendChild(funcRow);
+            });
+        }
+
+        // Create Component Card
+        function createComponentElement(item) {
+            const div = document.createElement('div');
+            div.className = `component-card border-2 rounded-xl p-3 flex items-center gap-3 select-none ${item.color}`;
+            div.dataset.id = item.id;
+            div.innerHTML = `
+                <div class="text-3xl">${item.icon}</div>
+                <div class="font-bold tracking-wide">${item.name}</div>
+            `;
+            
+            div.addEventListener('click', (e) => handleComponentClick(e, div));
+            return div;
+        }
+
+        // Handle clicking a component
+        function handleComponentClick(e, element) {
+            e.stopPropagation();
+            
+            // If it's inside a drop zone, move it back to pool
+            if (element.parentElement.classList.contains('drop-zone')) {
+                const pool = document.getElementById('components-pool');
+                pool.appendChild(element);
+                
+                // Reset drop zone text if empty
+                const dropZone = element.parentElement;
+                if(dropZone) {
+                     // The element is actually moved by appendChild before this, 
+                     // so parentElement here would be the pool. We need to handle this differently.
+                }
+                
+                // Fix: Properly reset dropzone text when component is removed
+                document.querySelectorAll('.drop-zone').forEach(zone => {
+                    if(zone.children.length === 0) {
+                        zone.innerHTML = `<span class="text-slate-400 text-sm italic pointer-events-none">Klik di sini untuk padan</span>`;
+                        zone.classList.remove('correct-match', 'incorrect-match');
+                    }
+                });
+
+                if (selectedComponentId === element.dataset.id) {
+                    clearSelection();
+                }
+                return;
+            }
+
+            // Normal selection in pool
+            if (selectedComponentId === element.dataset.id) {
+                clearSelection(); // Deselect
+            } else {
+                clearSelection();
+                element.classList.add('selected');
+                selectedComponentId = element.dataset.id;
+                
+                // Highlight all empty drop zones
+                document.querySelectorAll('.drop-zone').forEach(zone => {
+                    if(zone.querySelectorAll('.component-card').length === 0) {
+                        zone.classList.add('active-target');
+                    }
+                });
+            }
+        }
+
+        // Handle clicking a drop zone
+        function handleDropZoneClick(dropZone) {
+            if (!selectedComponentId) return;
+
+            const selectedElement = document.querySelector(`.component-card[data-id="${selectedComponentId}"]`);
+            
+            if (selectedElement) {
+                // If drop zone has placeholder, clear it
+                if (dropZone.querySelector('span')) {
+                    dropZone.innerHTML = '';
+                }
+
+                // If drop zone already has a component, move the old one back to pool
+                const existingComponent = dropZone.querySelector('.component-card');
+                if (existingComponent) {
+                    document.getElementById('components-pool').appendChild(existingComponent);
+                }
+
+                // Move selected component to drop zone
+                dropZone.appendChild(selectedElement);
+                clearSelection();
+                
+                // Remove check styling if user changes answer
+                dropZone.classList.remove('correct-match', 'incorrect-match');
+            }
+        }
+
+        // Clear selection visual states
+        function clearSelection() {
+            selectedComponentId = null;
+            document.querySelectorAll('.component-card').forEach(c => c.classList.remove('selected'));
+            document.querySelectorAll('.drop-zone').forEach(z => z.classList.remove('active-target'));
+        }
+
+        // Check Answers Logic
+        document.getElementById('btn-check').addEventListener('click', () => {
+            const dropZones = document.querySelectorAll('.drop-zone');
+            let correctCount = 0;
+            let answeredCount = 0;
+
+            dropZones.forEach(zone => {
+                const component = zone.querySelector('.component-card');
+                zone.classList.remove('correct-match', 'incorrect-match');
+
+                if (component) {
+                    answeredCount++;
+                    const componentId = component.dataset.id;
+                    const expectedId = zone.dataset.matchId;
+
+                    if (componentId === expectedId) {
+                        zone.classList.add('correct-match');
+                        correctCount++;
+                    } else {
+                        zone.classList.add('incorrect-match');
+                    }
+                }
+            });
+
+            if (answeredCount < gameData.length) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'Belum Siap!',
+                    text: 'Sila padankan semua komponen terlebih dahulu.',
+                    confirmButtonColor: '#3b82f6'
+                });
+                return;
+            }
+
+            if (correctCount === gameData.length) {
+                confetti({
+                    particleCount: 150,
+                    spread: 70,
+                    origin: { y: 0.6 }
+                });
+                Swal.fire({
+                    icon: 'success',
+                    title: 'Tahniah! 🎉',
+                    text: 'Anda telah memadankan kesemua komponen fertigasi dengan TEPAT!',
+                    confirmButtonColor: '#22c55e'
+                });
+            } else {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'Ada Kesilapan',
+                    text: `Anda mendapat ${correctCount} / ${gameData.length} betul. Cuba perbaiki jawapan yang ditandakan merah.`,
+                    confirmButtonColor: '#ef4444'
+                });
+            }
+        });
+
+        // Reset Logic
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            Swal.fire({
+                title: 'Mula Semula?',
+                text: "Semua jawapan anda akan dipadam.",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#3b82f6',
+                cancelButtonColor: '#64748b',
+                confirmButtonText: 'Ya, mula semula!',
+                cancelButtonText: 'Batal'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    initGame();
+                }
+            })
+        });
+
+        // Start game on load
+        window.onload = initGame;
+
+    </script>
+</body>
+</html>
